@@ -25,26 +25,26 @@ class DecoderRNN(BaseRNN):
     KEY_ENCODER_CONTEXT = 'encoder_context'
     KEY_ENCODER_HIDDEN = 'encoder_hidden'
 
-    def __init__(self, vocab_size, max_len, hidden_size, embedding_size,
-            sos_id, eos_id, input_dropout_p=0, dropout_p=0,
-            n_layers=1, bidirectional=False, rnn_cell='lstm',use_attention=True):
-        super(DecoderRNN, self).__init__(vocab_size, max_len, hidden_size,
-                input_dropout_p, dropout_p,
-                n_layers, rnn_cell)
+    def __init__(self, vocab_size, max_length, hidden_size, word_embedding_size,
+            sos_id, eos_id, input_dropout=0, rnn_dropout=0,
+            number_of_layers=1, bidirectional=False, rnn_cell='lstm',use_attention=True):
+        super(DecoderRNN, self).__init__(vocab_size, max_length, hidden_size,
+                input_dropout, rnn_dropout,
+                number_of_layers, rnn_cell)
 
         self.bidirectional_encoder = bidirectional
 
         self.output_size = vocab_size
-        self.max_length = max_len
+        self.max_length = max_length
         self.use_attention = use_attention
         self.eos_id = eos_id
         self.sos_id = sos_id
 
         self.init_input = None
 
-        self.embedding = nn.Embedding(self.output_size, embedding_size)
-        self.rnn = self.rnn_cell(embedding_size, hidden_size, n_layers,
-                                 batch_first=True, bidirectional=bidirectional, dropout=dropout_p)
+        self.embedding = nn.Embedding(self.output_size, word_embedding_size)
+        self.rnn = self.rnn_cell(embedding_size, hidden_size, number_of_layers,
+                                 batch_first=True, bidirectional=bidirectional, rnn_dropout=rnndropout)
 
         if use_attention:
             self.attention = Attention(self.hidden_size)
