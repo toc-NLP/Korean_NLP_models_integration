@@ -8,35 +8,27 @@ from models.baseRNN import BaseRNN
 
 class EncoderRNN(BaseRNN):
 
-    def __init__(self, vocab_size, max_len, hidden_size,
-                 embedding_size, input_dropout_p=0, dropout_p=0,
-                 n_layers=1, bidirectional=False, rnn_cell='lstm', variable_lengths=False,
-                 embedding=None, update_embedding=True):
-        super(EncoderRNN, self).__init__(vocab_size, max_len, hidden_size,
-                input_dropout_p, dropout_p, n_layers, rnn_cell)
+    def __init__(self, vocab_size, max_length, hidden_size,
+                 word_embedding_size, input_dropout=0, drnn_ropout=0,
+                 number_of_layers=1, bidirectional=False, rnn_cell='lstm', variable_lengths=False,
+                 pretrained_embedding=None, update_embedding=True):
+        super(EncoderRNN, self).__init__(vocab_size, max_length, hidden_size,
+                input_dropout, rnn_dropout, number_of_layers, rnn_cell)
 
         self.variable_lengths = variable_lengths
-        self.embedding = nn.Embedding(vocab_size, embedding_size)
-        if embedding is not None:
-            self.embedding.weight = nn.Parameter(embedding)
+        self.word_embedding = nn.Embedding(vocab_size, embedding_size)
+        if pretrained_embedding is not None:
+            self.embedding.weight = nn.Parameter(pretrained_embedding)
         self.embedding.weight.requires_grad = update_embedding
-        self.pos_embedding = pos_embedding
-        if self.pos_embedding != None:
-            self.rnn = self.rnn_cell(embedding_size+pos_embedding_size, hidden_size, n_layers,
-                                 batch_first=True, bidirectional=bidirectional, dropout=dropout_p)
-        else:
-            self.rnn = self.rnn_cell(embedding_size, hidden_size, n_layers,
-                                 batch_first=True, bidirectional=bidirectional, dropout=dropout_p)
+        self.rnn = self.rnn_cell(embedding_size, hidden_size, number_of_layers,
+                                 batch_first=True, bidirectional=bidirectional, dropout=rnn_dropout)
 
-    def forward(self, input_var, input_partition, input_lengths=None):
-        batch_size = input_var.size(0)
-        seq_len = input_var.size(1)
-
-        embedded = self.embedding(input_var)
+    def forward(self, input_variable, input_lengths=None):
+        word_embedded = self.word_embedding(input_variable)
 
         if self.variable_lengths:
-            embedded = nn.utils.rnn.pack_padded_sequence(embedded, input_lengths, batch_first=True)
-        output, hidden = self.rnn(embedded)
+            word_embedded = nn.utils.rnn.pack_padded_sequence(word_embedded, input_lengths, batch_first=True)
+        output, hidden = self.rnn(word_embedded)
         if self.variable_lengths:
             output, _ = nn.utils.rnn.pad_packed_sequence(output, batch_first=True)
 
