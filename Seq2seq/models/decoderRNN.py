@@ -26,7 +26,7 @@ class DecoderRNN(BaseRNN):
     KEY_ENCODER_HIDDEN = 'encoder_hidden'
 
     def __init__(self, vocab_size, max_len, hidden_size, embedding_size,
-            sos_id, eos_id, input_dropout_p=0, dropout_p=0, pos_embedding_size=None, pos_embedding=None,
+            sos_id, eos_id, input_dropout_p=0, dropout_p=0,
             n_layers=1, bidirectional=False, rnn_cell='lstm',use_attention=True):
         super(DecoderRNN, self).__init__(vocab_size, max_len, hidden_size,
                 input_dropout_p, dropout_p,
@@ -43,12 +43,7 @@ class DecoderRNN(BaseRNN):
         self.init_input = None
 
         self.embedding = nn.Embedding(self.output_size, embedding_size)
-        self.pos_embedding = pos_embedding
-        if self.pos_embedding != None:
-            self.rnn = self.rnn_cell(embedding_size+pos_embedding_size, hidden_size, n_layers,
-                                 batch_first=True, bidirectional=bidirectional, dropout=dropout_p)
-        else:
-            self.rnn = self.rnn_cell(embedding_size, hidden_size, n_layers,
+        self.rnn = self.rnn_cell(embedding_size, hidden_size, n_layers,
                                  batch_first=True, bidirectional=bidirectional, dropout=dropout_p)
 
         if use_attention:
@@ -56,14 +51,11 @@ class DecoderRNN(BaseRNN):
 
         self.out = nn.Linear(self.hidden_size, self.output_size)
 
-    def forward_step(self, input_var, input_part, hidden, encoder_outputs, function):
+    def forward_step(self, input_var, hidden, encoder_outputs, function):
         batch_size = input_var.size(0)
         output_size = input_var.size(1)
         
-        if self.pos_embedding == None:
-            embedded = self.embedding(input_var)
-        else:
-            embedded = torch.cat((self.embedding(input_var), self.pos_embedding(input_part)), dim=2)
+        embedded = self.embedding(input_var)
         output, hidden = self.rnn(embedded, hidden)
 
         attn = None
@@ -73,7 +65,7 @@ class DecoderRNN(BaseRNN):
         predicted_softmax = function(self.out(output.contiguous().view(-1, self.hidden_size)), dim=1).view(batch_size, output_size, -1)
         return predicted_softmax, hidden, attn
 
-    def forward(self, inputs=None, input_partition=None, encoder_hidden=None, encoder_outputs=None,
+    def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None,
                     function=F.log_softmax, teacher_forcing_ratio=0):
         ret_dict = dict()
         ret_dict[DecoderRNN.KEY_ENCODER_OUTPUTS] = encoder_outputs.squeeze(0)
@@ -112,14 +104,10 @@ class DecoderRNN(BaseRNN):
                 lengths[update_idx] = len(sequence_symbols)
             return symbols
 
-        length_tensor = None
         if use_teacher_forcing:
             decoder_input = inputs[:, :-1]
-            if self.pos_embedding != None:
-                decoder_part = input_partition[:, :-1]
-            else:
-                decoder_part = None
-            decoder_output, decoder_hidden, attn = self.forward_step(decoder_input, decoder_part, decoder_hidden, encoder_outputs, function=function)
+            decoder_output, decoder_hidden, attn = self.forward_step(decoder_input, 
+                    decoder_hidden, encoder_outputs, function=function)
 
             for di in range(decoder_output.size(1)):
                 step_output = decoder_output[:, di, :]
@@ -131,11 +119,8 @@ class DecoderRNN(BaseRNN):
         else:
             decoder_input = inputs[:, 0].unsqueeze(1)
             for di in range(max_length):
-                if self.pos_embedding != None:
-                    decoder_part = input_partition[:, di].unsqueeze(1)
-                else:
-                    decoder_part = None
-                decoder_output, decoder_hidden, step_attn = self.forward_step(decoder_input, decoder_part, decoder_hidden, encoder_outputs, function=function)
+                decoder_output, decoder_hidden, step_attn = self.forward_step(decoder_input, 
+                        decoder_hidden, encoder_outputs, function=function)
                 step_output = decoder_output.squeeze(1)
                 symbols = decode(di, step_output, step_attn)
                 decoder_input = symbols
