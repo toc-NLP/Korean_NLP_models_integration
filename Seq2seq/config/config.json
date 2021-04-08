@@ -3,7 +3,7 @@
     "word_embedding_size": 14,
     "hidden_size": 64,
     "input_dropout": 0.2,
-    "dropout": 0,
+    "rnn_dropout": 0,
     "number_of_layers": 1,
     "bidirectional": false,
     "rnn_cell": "lstm",
