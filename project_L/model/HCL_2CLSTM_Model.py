@@ -20,15 +20,8 @@ class CLSTM1(nn.Module):
     def __init__(self, args, weight=None):
         super(CLSTM1, self).__init__()
         self.args = args
-        self.hidden_dim = args.lstm_hidden_dim
-        self.num_layers = args.lstm_num_layers
-        D = args.embed_dim
-        C = args.class_num
-        F = args.clstm_filter_size
-        H = args.clstm_hidden_size
-        Ck = args.clstm_kernel
-        V = args.embed_num
-        D = args.embed_dim
+        
+        Ck = args.word_kernel
         if(weight==None):
             self.embed = nn.Embedding(V, D)
         else:
@@ -44,15 +37,15 @@ class CLSTM1(nn.Module):
         for K in Ck:
             KK.append( K + 1 if K % 2 == 0 else K)
 
-        self.convs_1d = nn.ModuleList([nn.Conv2d(1, F, (k, D), padding=(k//2,0)) for k in KK])
+        self.convs_1d = nn.ModuleList([nn.Conv2d(1, 100, (k, 300), padding=(k//2,0)) for k in KK])
         
             
-        self.bilstm = nn.LSTM(F, self.hidden_dim, dropout=args.dropout, num_layers=self.num_layers, bidirectional=True)
+        self.bilstm = nn.LSTM(100, 100, dropout=0.1, num_layers=1, bidirectional=True)
         # gru
         # linear
-        self.hidden2label = nn.Linear(self.hidden_dim * 2, C)
+        self.hidden2label = nn.Linear(100 * 2, 2)
         #  dropout
-        self.dropout = nn.Dropout(args.dropout)
+        self.dropout = nn.Dropout(0.1)
         
     def conv_and_pool(self, input, conv):
         cnn_x = conv(input)
@@ -83,28 +76,20 @@ class CLSTM2(nn.Module):
     def __init__(self, args, weight=None):
         super(CLSTM2, self).__init__()
         self.args = args
-        self.hidden_dim = args.lstm_hidden_dim
-        self.num_layers = args.lstm_num_layers
-        D = args.embed_dim
-        C = args.class_num
-        F = args.clstm_filter_size
-        H = args.clstm_hidden_size
-        Ck = args.clstm_add_kerneli
-        V = args.embed_num
-        D = args.embed_dim
+        Ck = args.word_kernel
         if(weight==None):
             self.embed = nn.Embedding(V, D)
         else:
             self.embed = nn.Embedding.from_pretrained(weight).cuda()
 
             
-        self.convs_1d = nn.ModuleList([nn.Conv2d(1, F, (K, D)) for K in Ck])  
-        self.bilstm = nn.LSTM(F, self.hidden_dim, dropout=args.dropout, num_layers=self.num_layers, bidirectional=True)
+        self.convs_1d = nn.ModuleList([nn.Conv2d(1, 100, (K, 300)) for K in Ck])  
+        self.bilstm = nn.LSTM(100, 100, dropout=0.1, num_layers=1, bidirectional=True)
         # gru
         # linear
-        self.hidden2label = nn.Linear(self.hidden_dim * 2, C)
+        self.hidden2label = nn.Linear(100 * 2, 2)
         #  dropout
-        self.dropout = nn.Dropout(args.dropout)
+        self.dropout = nn.Dropout(0.1)
         
     def conv_and_pool(self, input, conv):
         cnn_x = conv(input)
@@ -154,16 +139,23 @@ class wordCLSTM(nn.Module):
 
 
         KK=[]
+        
+        print("WK#:", Wk)
         for K in Wk:
+            K = int(K)
             KK.append( K + 1 if K % 2 == 0 else K)
 
-            
-        self.convs_1d = nn.ModuleList([
-            nn.Conv2d(Ci, F, (k, D), padding=(k//2,0)) 
-            for k in KK])
+        
+        print("WK22:", Wk)
+        print("F:", F)
+        print("H:", H)
+        print("V:", V)
+        print("D:",D)
+        
+        self.convs_1d = nn.ModuleList([nn.Conv2d(1, 100, (k, 300), padding=(k//2,0)) for k in KK])
         
       
-        self.bilstm = nn.LSTM(F, H, dropout=args.dropout, num_layers=self.num_layers, bidirectional=True)
+        self.bilstm = nn.LSTM(100, 100, dropout=0.1, num_layers=self.num_layers, bidirectional=True)
         
 
         
@@ -180,7 +172,8 @@ class wordCLSTM(nn.Module):
         input = self.embed(input)
         embeds = input.unsqueeze(1)
         embeds = self.dropout(embeds)
-       
+      
+        print('embed#;', embeds.shape)
         cnn_x = [self.conv_and_pool(embeds, conv) for conv in self.convs_1d]
         cnn_x = torch.cat(cnn_x, 1)
         cnn_x = torch.transpose(cnn_x, 1,2)
@@ -201,11 +194,8 @@ class sentCLSTM(nn.Module):
         D = args.embed_dim
         C = args.class_num
         Ci = 1
-        F = args.clstm_filter_size
-        H = args.clstm_hidden_size
-        Sk = args.sent_kernel
-        self.num_layers = args.lstm_num_layers
 
+        Sk = args.word_kernel
 
         KK=[]
         for K in Sk:
@@ -213,14 +203,14 @@ class sentCLSTM(nn.Module):
             
         
         self.convs_1d = nn.ModuleList([
-            nn.Conv2d(Ci, F, (k, H*2), padding=(k//2,0)) 
+            nn.Conv2d(1, 100, (k, 200), padding=(k//2,0)) 
             for k in KK])
         
         #self.convs_1d = [nn.Conv2d(Ci, F, (K, H*2), stride=1, padding=(K//2, 0)) for K in KK]
 
-        self.bilstm = nn.LSTM(F, H, dropout=args.dropout, num_layers=self.num_layers, bidirectional=True)
+        self.bilstm = nn.LSTM(100, 100, dropout=args.dropout, num_layers=1, bidirectional=True)
         self.dropout = nn.Dropout(args.dropout)
-        self.hidden2label1 = nn.Linear(H*2, C)
+        self.hidden2label1 = nn.Linear(100*2, C)
 
     def conv_and_pool(self, input, conv):
         cnn_x = conv(input)
@@ -247,7 +237,7 @@ class sentCLSTM(nn.Module):
     
 class HCL_CLSTM_CLSTM(nn.Module):
     
-    def __init__(self, args,weight=None):
+    def __init__(self, args,weight=None, name='HCL'):
         super(HCL_CLSTM_CLSTM, self).__init__()
         
         V = args.embed_num
@@ -263,22 +253,28 @@ class HCL_CLSTM_CLSTM(nn.Module):
         self.CLSTM1= CLSTM1(args,weight)
         self.CLSTM2 = CLSTM2(args,weight)
         
+        self.mode = name
 
         self.relu = nn.ReLU()
 
-    def forward(self, embed, source,max_sents):
-        s = None
-        for i in range(max_sents):
-            _s = self.wordCLSTM(embed[:,i,:])
-            if(s is None):
-                s = _s
-            else:
-                s = torch.cat((s,_s),0)    
+    def forward(self, embed):
+        if(self.mode == 'HCL'):
+            s = None
+            for i in range(0, int(embed.size(1))):
+                _s = self.wordCLSTM(embed[:,i,:])
+                if(s is None):
+                    s = _s
+                else:
+                    s = torch.cat((s,_s),0)    
+            logits = self.senCLSTM(s)
 
-        logits_HCL = self.senCLSTM(s)
-        logits_CLSTM1 = self.CLSTM1(source)
-        logits_CLSTM2 = self.CLSTM2(source)
-        
-        logits = logits_HCL+logits_CLSTM1+logits_CLSTM2
+            if(self.mode == 'HCL_CLSTM'):
+                logits_CLSTM1 = self.CLSTM1(source)
+                logits = logits_HCL+logits_CLSTM1
+
+            if(self.mode == 'HCL_2CLSTM'):
+                logits_CLSTM1 = self.CLSTM1(source)
+                logits_CLSTM2 = self.CLSTM2(source)
+                logits = logits_HCL+logits_CLSTM1+logits_CLSTM2
      
         return F.log_softmax(logits, dim=1)

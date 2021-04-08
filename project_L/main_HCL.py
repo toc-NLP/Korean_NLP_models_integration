@@ -6,9 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 from model.CNN_Model import CNN_Text
-from model.HCL_CLSTM_Model import HCL_CLSTM
 from model.HCL_2CLSTM_Model import HCL_CLSTM_CLSTM
-from model.HCL_Model import HCL
 
 
 
@@ -71,31 +69,45 @@ for i in range(0, len(embed_lookup.wv.index2word)):
 def tokenizer(inputText):
     reviews_words = inputText.split(' ')
     tokenized_reviews = []
+    sentences = []
     for word in reviews_words:
-        if('"' in word or "'" in word or '?' in word or '!' in word or '.' in word ',' in word):
-            word = word.replace('.','').replace("'",'').replace('"','').replace('?','').replace('!','').replace(',','')
+        if('.' in word  or '?' in word  or '!' in word ):
+            word = word.replace('.', '').replace('!','').replace('?','')
+            try:
+                sentences.append(word2index[word])
+            except:
+                sentences.append(0)
+            if(len(sentences) >= 2):
+                tokenized_reviews.append(sentences)
+               # print("token##:", tokenized_reviews)
+            sentences = []
+            continue
         try:
             idx = word2index[word]
         except: 
             idx = 0
-        tokenized_reviews.append(idx)
+        sentences.append(idx)
+    if(len(sentences)>=2):
+        tokenized_reviews.append(sentences)
     return tokenized_reviews
 
 
 print("Reading Train set......")
 
-maxLen=0
 
 fr = open('./nsmc/ratings_train.tsv', 'r', encoding='utf-8')
 lines = csv.reader(fr,  delimiter='\t')
 X_train=[]
 y_train=[]
-
+meanSen = []
+meanLine = []
 for line in lines:
     if('label' in line[0]):
         continue
     w2i = list(tokenizer(line[1]))
-    maxLen = max(maxLen, len(w2i))
+    for subsentence in w2i:
+        meanSen.append(len(subsentence))
+    meanLine.append(len(w2i))
     X_train.append(w2i)
     y_train.append([int(line[0])])
 fr.close()
@@ -111,19 +123,40 @@ for line in lines:
     if('label' in line[0]):
         continue
     w2i = list(tokenizer(line[1]))
-    maxLen = max(maxLen, len(w2i))
+    for subsentence in w2i:
+        meanSen.append(len(subsentence))
+    meanLine.append(len(w2i))
     X_test.append(w2i)
     y_test.append([int(line[0])])
 fr.close()
 
+maxLen = int(np.max(meanSen))
+maxSen = int(np.max(meanLine))
 
-for i  in range(0, len(X_train)):
-    n_pad = maxLen - len(X_train[i])
-    X_train[i].extend([0]*n_pad)
 
-for i in range(0, len(X_test)):
-    n_pad = maxLen - len(X_test[i])
-    X_test[i].extend([0]*n_pad)
+
+print('maxLen:', maxLen)
+print('maxSen:', maxSen)
+for i  in range(0,len(X_train)):
+    for k in range(0, len(X_train[i])):
+        n_pad = maxLen - len(X_train[i][k])
+        X_train[i][k].extend([0]*n_pad)
+    n_pad = maxSen - len(X_train[i])
+    for l in range(0, n_pad):
+        temp=[]
+        temp.extend([0]*maxLen)
+        X_train[i].append(temp)
+
+for i  in range(0,len(X_test)):
+    for k in range(0, len(X_test[i])):
+        n_pad = maxLen - len(X_test[i][k])
+        X_test[i][k].extend([0]*n_pad)
+    n_pad = maxSen - len(X_test[i])
+    for l in range(0, n_pad):
+        temp=[]
+        temp.extend([0]*maxLen)
+        X_test[i].append(temp)
+
 
 print("pre-trained embedding loading........")
 
@@ -167,10 +200,10 @@ args.cuda = (not args.no_cuda) and torch.cuda.is_available(); del args.no_cuda
 args.kernel_sizes = [int(k) for k in args.kernel_sizes.split(',')]
 args.save_dir = os.path.join(args.save_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
 #model = CNN_Text(args,weights)
-model = HCL_CLSTM_CLSTM(args,weights)
-batch = 128
+model = HCL_CLSTM_CLSTM(args,weights,'HCL')
+batch = 16
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-data_iter = DataLoader(dataset=IrisDataset(X_train, y_train), batch_size=batch, shuffle=True)
+data_iter = DataLoader(dataset=IrisDataset(X_train, y_train), batch_size=batch, shuffle=False)
 data_test_iter = DataLoader(dataset=IrisDataset(X_test, y_test), batch_size=batch, shuffle=False)
 loss_sum =0.
 
