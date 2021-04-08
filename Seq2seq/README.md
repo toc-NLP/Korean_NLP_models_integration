@@ -22,4 +22,12 @@ input_vocab = source.vocab
 target_vocab = target.vocab
 source_vocab_size = len(input_vocab)
 target_vocab_size = len(target_vocab)
+
+# bastch iterator 생성
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+batch_iterator = torchtext.data.BucketIterator(
+    dataset=train_data, batch_size=self.batch_size,
+    sort=False, sort_within_batch=True,
+    sort_key=lambda x: len(x.src),
+    device=device, repeat=False)
 ```
