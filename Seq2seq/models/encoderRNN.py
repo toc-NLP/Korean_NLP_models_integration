@@ -9,7 +9,7 @@ from models.baseRNN import BaseRNN
 class EncoderRNN(BaseRNN):
 
     def __init__(self, vocab_size, max_length, hidden_size,
-                 word_embedding_size, input_dropout=0, drnn_ropout=0,
+                 word_embedding_size, input_dropout=0, rnn_dropout=0,
                  number_of_layers=1, bidirectional=False, rnn_cell='lstm', variable_lengths=False,
                  pretrained_embedding=None, update_embedding=True):
         super(EncoderRNN, self).__init__(vocab_size, max_length, hidden_size,
