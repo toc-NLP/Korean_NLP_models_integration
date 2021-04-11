@@ -35,5 +35,5 @@ batch_iterator = torchtext.data.BucketIterator(
 ## Model Training
 Train the data with our model.
 ```     sh
-    bash train.sh
+bash train.sh
 ```
