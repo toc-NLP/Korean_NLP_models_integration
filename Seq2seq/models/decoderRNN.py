@@ -9,7 +9,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
 
-from models.attention import Attention
+from models.attention import Attention, Attention_Bahdanau
 from models.baseRNN import BaseRNN
 
 if torch.cuda.is_available():
@@ -43,11 +43,18 @@ class DecoderRNN(BaseRNN):
         self.init_input = None
 
         self.embedding = nn.Embedding(self.output_size, word_embedding_size)
-        self.rnn = self.rnn_cell(embedding_size, hidden_size, number_of_layers,
-                                 batch_first=True, bidirectional=bidirectional, rnn_dropout=rnndropout)
 
-        if use_attention:
+        if use_attention is "Luong":
+            self.rnn = self.rnn_cell(word_embedding_size, hidden_size, number_of_layers,
+                                 batch_first=True, bidirectional=bidirectional, rnn_dropout=rnndropout)
             self.attention = Attention(self.hidden_size)
+        elif use_attention is "Bahdanau":
+            self.rnn = self.rnn_cell(hidden_size + word_embedding_size, hidden_size, number_of_layers,
+                                 batch_first=True, bidirectional=bidirectional, rnn_dropout=rnndropout)
+            self.attention = Attention_Bahdanau(self.hidden_size)
+        else:
+            self.rnn = self.rnn_cell(word_embedding_size, hidden_size, number_of_layers,
+                                 batch_first=True, bidirectional=bidirectional, rnn_dropout=rnndropout)
 
         self.out = nn.Linear(self.hidden_size, self.output_size)
 
@@ -56,11 +63,27 @@ class DecoderRNN(BaseRNN):
         output_size = input_var.size(1)
         
         embedded = self.embedding(input_var)
-        output, hidden = self.rnn(embedded, hidden)
 
-        attn = None
-        if self.use_attention:
+        if self.use_attention == "Luong":
+            output, hidden = self.rnn(embedded, hidden)
             output, attn = self.attention(output, encoder_outputs)
+        elif use_attention is "Bahdanau":
+            attn = self.attention(hidden[-1], encoder_outputs)
+            input_v = input_var.unsqueeze(2)
+            input_v = input_v.float()
+            # input_v = batch_size * out_len * 1
+            # attn = batch_size * 1 * in_len
+            # attn_v = batch_size * out_len * in_len
+            attn_v = torch.bmm(input_v, attn)
+            #attn = attn.view(batch_size, output_size, -1)
+            # ontext = batch * out_len * (hidden_size*2)
+            context = attn_v.bmm(encoder_outputs)  # (B,s,V)
+            rnn_input = torch.cat((embedded, context), 2)
+            attn = attn_v
+            output, hidden = self.rnn(rnn_input, hidden)
+        else:
+            output, hidden = self.rnn(embedded, hidden)
+            attn = None
 
         predicted_softmax = function(self.out(output.contiguous().view(-1, self.hidden_size)), dim=1).view(batch_size, output_size, -1)
         return predicted_softmax, hidden, attn
